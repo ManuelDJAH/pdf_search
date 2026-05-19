@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Scrapper{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title"><i class="bi bi-broadcast me-2" style="color:var(--accent)"></i>Scrapper</h1>
+  <p class="page-subtitle">
+    Gestiona las fuentes web y lanza el scrapeado de documentos PDF.
+  </p>
+</div>
+
+{% if not sources %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted-custom">
+    <i class="bi bi-link-45deg display-4 d-block mb-2 opacity-25"></i>
+    No hay fuentes configuradas todavía.<br>
+    <a href="{{ url_for('configuration') }}" class="text-primary">
+      Agrega una URL en Configuration
+    </a>
+    para comenzar.
+  </div>
+</div>
+{% else %}
+
+<div id="sources-container">
+{% for source in sources %}
+<div class="source-card" id="src-{{ source.id }}">
+
+  <!-- Source header -->
+  <div class="source-header">
+    <span class="status-dot {% if source.scraped %}scraped{% else %}unscraped{% endif %}"
+          id="dot-{{ source.id }}"
+          title="{{ 'Scrapeado' if source.scraped else 'No scrapeado' }}"></span>
+
+    <a href="{{ source.url }}" target="_blank" class="source-url">
+      {{ source.url }}
+    </a>
+
+    <span class="mono text-muted-custom" style="font-size:.7rem; white-space:nowrap;">
+      {% if source.scraped and source.last_scraped %}
+        <i class="bi bi-clock me-1"></i>{{ source.last_scraped[:10] }}
+      {% else %}
+        <i class="bi bi-circle me-1"></i>Pendiente
+      {% endif %}
+    </span>
+
+    <button class="btn-scrape"
+            id="btn-{{ source.id }}"
+            onclick="startScrape({{ source.id }}, this)">
+      <i class="bi bi-play-fill me-1"></i>Scrape
+    </button>
+  </div>
+
+  <!-- Progress bar (hidden by default) -->
+  <div class="px-3 pt-2 pb-0" id="progress-{{ source.id }}" style="display:none;">
+    <div class="progress" style="height:3px; background:var(--surface-2);">
+      <div class="progress-bar progress-bar-striped progress-bar-animated"
+           style="width:100%; background:var(--accent);"></div>
+    </div>
+    <p class="mono text-muted-custom mt-1 mb-1" style="font-size:.71rem;"
+       id="prog-msg-{{ source.id }}">Iniciando…</p>
+  </div>
+
+  <!-- Document chips -->
+  <div class="doc-list" id="docs-{{ source.id }}">
+    {% for doc in source.documents %}
+    <a href="{{ doc.url }}" target="_blank"
+       class="doc-chip"
+       title="{{ doc.url }}">
+      <i class="bi bi-file-pdf me-1"></i>{{ doc.filename }}
+    </a>
+    {% else %}
+      <span class="text-muted-custom" style="font-size:.75rem; padding:.3rem;">
+        Sin documentos aún
+      </span>
+    {% endfor %}
+  </div>
+
+</div><!-- /.source-card -->
+{% endfor %}
+</div><!-- /#sources-container -->
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+/**
+ * Start a scrape job for source_id and poll until done,
+ * showing real-time chip updates.
+ */
+async function startScrape(sourceId, btn) {
+  btn.disabled = true;
+  btn.className = 'btn-scrape running';
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Scraping…';
+
+  const progress = document.getElementById(`progress-${sourceId}`);
+  const progMsg  = document.getElementById(`prog-msg-${sourceId}`);
+  const docsDiv  = document.getElementById(`docs-${sourceId}`);
+  const dot      = document.getElementById(`dot-${sourceId}`);
+  progress.style.display = 'block';
+
+  // ── Start job ──────────────────────────────────────────────────────────────
+  let jobId;
+  try {
+    const res  = await fetch(`/scrapper/start/${sourceId}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    jobId = data.job_id;
+  } catch (err) {
+    progMsg.textContent = '⚠ Error al iniciar: ' + err.message;
+    btn.disabled = false;
+    btn.className = 'btn-scrape';
+    btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Scrape';
+    return;
+  }
+
+  // ── Poll job ───────────────────────────────────────────────────────────────
+  let lastDocCount = 0;
+  const poll = setInterval(async () => {
+    try {
+      const res  = await fetch(`/scrapper/job/${jobId}`);
+      const data = await res.json();
+
+      // Update chips for new docs
+      if (data.docs && data.docs.length > lastDocCount) {
+        const newDocs = data.docs.slice(lastDocCount);
+        if (lastDocCount === 0) docsDiv.innerHTML = ''; // clear "sin documentos"
+        newDocs.forEach(doc => {
+          const chip = document.createElement('a');
+          chip.href      = doc.url;
+          chip.target    = '_blank';
+          chip.className = 'doc-chip';
+          chip.title     = doc.url;
+          chip.innerHTML = `<i class="bi bi-file-pdf me-1"></i>${doc.filename}`;
+          docsDiv.appendChild(chip);
+        });
+        lastDocCount = data.docs.length;
+        progMsg.textContent =
+          `${lastDocCount} documento${lastDocCount !== 1 ? 's' : ''} procesado${lastDocCount !== 1 ? 's' : ''}…`;
+      }
+
+      if (data.last_error) {
+        progMsg.textContent = '⚠ ' + data.last_error;
+      }
+
+      if (data.status === 'done' || data.status === 'error') {
+        clearInterval(poll);
+        progress.style.display = 'none';
+        dot.className = 'status-dot scraped';
+        dot.title = 'Scrapeado';
+        btn.disabled  = false;
+        btn.className = data.status === 'done' ? 'btn-scrape done' : 'btn-scrape';
+        btn.innerHTML = data.status === 'done'
+          ? '<i class="bi bi-check2 me-1"></i>Listo'
+          : '<i class="bi bi-play-fill me-1"></i>Reintentar';
+        if (lastDocCount === 0 && data.status === 'done') {
+          if (!docsDiv.querySelector('.doc-chip')) {
+            docsDiv.innerHTML =
+              '<span class="text-muted-custom" style="font-size:.75rem;padding:.3rem;">No se encontraron PDFs</span>';
+          }
+        }
+      }
+    } catch (_) { /* silently ignore poll errors */ }
+  }, 1500);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<!-- Page header -->
+<div class="page-header d-flex align-items-center justify-content-between">
+  <div>
+    <h1 class="page-title">
+      <span class="live-dot" id="liveDot" title="Actualización automática activa"></span>
+      Document Index
+    </h1>
+    <p class="page-subtitle">Estado actual del índice de documentos PDF</p>
+  </div>
+  <a href="{{ url_for('scrapper') }}" class="btn btn-primary">
+    <i class="bi bi-broadcast me-1"></i>Ir al Scrapper
+  </a>
+</div>
+
+<!-- ── Stats row ─────────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label">Documentos indexados</div>
+      <div class="stat-value" id="stat-docs">{{ stats.total_docs }}</div>
+      <i class="bi bi-file-earmark-pdf stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card accent">
+      <div class="stat-label">Palabras totales</div>
+      <div class="stat-value" id="stat-words">{{ "{:,}".format(stats.total_words) }}</div>
+      <i class="bi bi-alphabet stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card success">
+      <div class="stat-label">Fuentes scrapeadas</div>
+      <div class="stat-value" id="stat-sources">
+        {{ stats.sources_scraped }}<span style="font-size:1.1rem;opacity:.5;">/{{ stats.sources_total }}</span>
+      </div>
+      <i class="bi bi-check2-circle stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label">Con OCR</div>
+      <div class="stat-value" id="stat-ocr">{{ stats.ocr_docs }}</div>
+      <i class="bi bi-eye stat-icon"></i>
+    </div>
+  </div>
+</div>
+
+<!-- ── Documents by year ─────────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-calendar3 me-1"></i>Documentos por año</span>
+    <span class="mono" style="font-size:.7rem;color:var(--text-muted);">
+      Total: <span id="year-total">{{ stats.total_docs }}</span>
+    </span>
+  </div>
+  <div class="card-body p-2" id="yearList">
+    {% set max_count = stats.docs_by_year[0].count if stats.docs_by_year else 1 %}
+    {% for row in stats.docs_by_year %}
+    <div class="year-row">
+      <span class="year-badge">{{ row.year if row.year else '—' }}</span>
+      <span class="year-count">{{ row.count }}</span>
+      <span style="font-size:.75rem;color:var(--text-muted);">
+        doc{{ 's' if row.count != 1 else '' }}
+      </span>
+      <div class="year-bar-wrap">
+        <div class="year-bar"
+             style="width: {{ (row.count / max_count * 100)|int }}%"></div>
+      </div>
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted-custom">
+      <i class="bi bi-inbox display-6 d-block mb-2 opacity-25"></i>
+      No hay documentos indexados todavía.<br>
+      <a href="{{ url_for('scrapper') }}" class="text-primary">Inicia el Scrapper</a>
+      para indexar documentos.
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/**
+ * Poll /api/stats every 4 s so the page reflects scraping progress
+ * without a full reload.
+ */
+(function () {
+  const IDS = {
+    docs:    document.getElementById('stat-docs'),
+    words:   document.getElementById('stat-words'),
+    sources: document.getElementById('stat-sources'),
+    ocr:     document.getElementById('stat-ocr'),
+    total:   document.getElementById('year-total'),
+    yearList: document.getElementById('yearList'),
+    dot:     document.getElementById('liveDot'),
+  };
+
+  function fmt(n) {
+    return Number(n).toLocaleString('es-MX');
+  }
+
+  function renderYears(rows) {
+    if (!rows.length) return;
+    const max = rows[0].count || 1;
+    IDS.yearList.innerHTML = rows.map(r => `
+      <div class="year-row">
+        <span class="year-badge">${r.year ?? '—'}</span>
+        <span class="year-count">${r.count}</span>
+        <span style="font-size:.75rem;color:var(--text-muted);">doc${r.count !== 1 ? 's' : ''}</span>
+        <div class="year-bar-wrap">
+          <div class="year-bar" style="width:${Math.round(r.count / max * 100)}%"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  async function fetchStats() {
+    try {
+      const res  = await fetch('/api/stats');
+      const data = await res.json();
+
+      IDS.docs.textContent    = data.total_docs;
+      IDS.words.textContent   = fmt(data.total_words);
+      IDS.sources.innerHTML   =
+        `${data.sources_scraped}<span style="font-size:1.1rem;opacity:.5;">/${data.sources_total}</span>`;
+      IDS.ocr.textContent     = data.ocr_docs;
+      IDS.total.textContent   = data.total_docs;
+      renderYears(data.docs_by_year);
+
+      IDS.dot.style.background = 'var(--success)';
+    } catch (_) {
+      IDS.dot.style.background = 'var(--danger)';
+    }
+  }
+
+  setInterval(fetchStats, 4000);
+})();
+</script>
+{% endblock %}

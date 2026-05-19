@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Configuración{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-sliders me-2" style="color:var(--primary)"></i>Configuración
+  </h1>
+  <p class="page-subtitle">Administra las direcciones web que se usarán para buscar documentos PDF.</p>
+</div>
+
+<!-- ── Add URL form ───────────────────────────────────────────────────────── -->
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-plus-circle me-1"></i>Agregar nueva fuente
+  </div>
+  <div class="card-body">
+    <form action="{{ url_for('add_url') }}" method="post">
+      <div class="input-group">
+        <span class="input-group-text"
+              style="background:var(--surface-2);border-color:var(--border);color:var(--text-muted);">
+          <i class="bi bi-link-45deg"></i>
+        </span>
+        <input type="url" name="url" id="urlInput"
+               class="form-control"
+               style="background:var(--surface-2);border-color:var(--border);color:var(--text);font-family:var(--mono);font-size:.82rem;"
+               placeholder="https://example.com/documentos/"
+               required
+               autocomplete="off">
+        <button type="submit" class="btn btn-primary px-4">
+          <i class="bi bi-plus-lg me-1"></i>ADD
+        </button>
+      </div>
+      <div class="mt-2 text-muted-custom" style="font-size:.75rem;">
+        <i class="bi bi-info-circle me-1"></i>
+        La URL debe apuntar a una página que contenga enlaces a archivos <code>.pdf</code>.
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Existing sources ───────────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-list-ul me-1"></i>Fuentes configuradas</span>
+    <span class="mono" style="font-size:.7rem;color:var(--text-muted);">
+      {{ sources|length }} URL{{ 's' if sources|length != 1 else '' }}
+    </span>
+  </div>
+
+  {% if sources %}
+  <div>
+    {% for source in sources %}
+    <div class="config-item">
+      <!-- Status indicator -->
+      <span class="status-dot {% if source.scraped %}scraped{% else %}unscraped{% endif %}"
+            title="{{ 'Scrapeado' if source.scraped else 'No scrapeado' }}"></span>
+
+      <!-- URL -->
+      <span class="config-item-url">{{ source.url }}</span>
+
+      <!-- Scraped date -->
+      {% if source.scraped and source.last_scraped %}
+      <span class="mono text-muted-custom" style="font-size:.7rem;white-space:nowrap;">
+        <i class="bi bi-check2 me-1 text-success"></i>{{ source.last_scraped[:10] }}
+      </span>
+      {% else %}
+      <span class="mono text-muted-custom" style="font-size:.7rem;white-space:nowrap;">
+        <i class="bi bi-hourglass me-1"></i>Pendiente
+      </span>
+      {% endif %}
+
+      <!-- Actions -->
+      <div class="d-flex gap-2 flex-shrink-0">
+        <a href="{{ url_for('scrapper') }}" class="btn btn-sm"
+           style="font-size:.72rem;background:transparent;border:1px solid var(--border-hi);color:var(--text-muted);border-radius:6px;padding:.2rem .6rem;">
+          <i class="bi bi-broadcast me-1"></i>Scrape
+        </a>
+        <form action="{{ url_for('delete_url', source_id=source.id) }}"
+              method="post"
+              onsubmit="return confirm('¿Eliminar esta fuente y todos sus documentos?');">
+          <button type="submit" class="btn btn-sm"
+                  style="font-size:.72rem;background:transparent;border:1px solid rgba(239,68,68,.4);color:var(--danger);border-radius:6px;padding:.2rem .6rem;">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted-custom">
+    <i class="bi bi-inbox display-5 d-block mb-2 opacity-25"></i>
+    No hay fuentes configuradas. Agrega una URL arriba.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

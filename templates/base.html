@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}PDF Search{% endblock %} — DocIndex</title>
+
+  <!-- Bootstrap 5.3 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+        crossorigin="anonymous">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+        rel="stylesheet">
+  <!-- Google Fonts: Syne (display) + JetBrains Mono (mono) -->
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────────────────── */
+    :root {
+      --bg:          #0b0f19;
+      --surface:     #111827;
+      --surface-2:   #1a2235;
+      --border:      #1e2d45;
+      --border-hi:   #2e4a70;
+      --text:        #d1dce8;
+      --text-muted:  #5d7594;
+      --primary:     #3b82f6;
+      --primary-dim: #1e3a5f;
+      --accent:      #f59e0b;
+      --accent-dim:  #78350f;
+      --success:     #22c55e;
+      --danger:      #ef4444;
+      --mono:        'JetBrains Mono', monospace;
+      --display:     'Syne', sans-serif;
+    }
+
+    /* ── Base ──────────────────────────────────────────────────────────────── */
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--display);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse 60% 40% at 70% 10%, #0d2444 0%, transparent 60%),
+        radial-gradient(ellipse 50% 30% at 20% 80%, #0c1f3a 0%, transparent 60%);
+    }
+
+    /* ── Navbar ────────────────────────────────────────────────────────────── */
+    .navbar {
+      background: rgba(11, 15, 25, 0.92) !important;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      padding: 0.65rem 0;
+    }
+    .navbar-brand {
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: -0.5px;
+      color: var(--text) !important;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .brand-icon {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.95rem; color: #fff;
+      flex-shrink: 0;
+    }
+    .nav-link {
+      color: var(--text-muted) !important;
+      font-weight: 600;
+      font-size: 0.85rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      padding: 0.45rem 0.9rem !important;
+      border-radius: 6px;
+      transition: color .2s, background .2s;
+    }
+    .nav-link:hover,
+    .nav-link.active { color: var(--text) !important; background: var(--surface-2); }
+
+    /* ── Search bar in navbar ──────────────────────────────────────────────── */
+    .navbar-search { display: flex; gap: .4rem; }
+    .navbar-search .form-control {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: .82rem;
+      width: 200px;
+      border-radius: 8px 0 0 8px;
+      transition: border-color .2s, width .25s;
+    }
+    .navbar-search .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(59,130,246,.2);
+      width: 260px;
+    }
+    .navbar-search .btn-search {
+      background: var(--primary);
+      border: none;
+      border-radius: 0 8px 8px 0;
+      color: #fff;
+      padding: .38rem .75rem;
+      font-size: .82rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      transition: background .2s;
+    }
+    .navbar-search .btn-search:hover { background: #2563eb; }
+
+    /* ── Page shell ────────────────────────────────────────────────────────── */
+    .page-wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+    .page-header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.25rem;
+    }
+    .page-title {
+      font-size: 1.9rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin: 0;
+    }
+    .page-subtitle { color: var(--text-muted); font-size: .9rem; margin-top:.25rem; }
+
+    /* ── Cards ─────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .card-header {
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+      font-weight: 700;
+      font-size: .82rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: .65rem 1.1rem;
+    }
+
+    /* ── Stat cards ─────────────────────────────────────────────────────────── */
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.4rem 1.6rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .25s, transform .2s;
+    }
+    .stat-card:hover { border-color: var(--border-hi); transform: translateY(-2px); }
+    .stat-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(59,130,246,.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .stat-card .stat-label {
+      font-size: .75rem; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--text-muted); margin-bottom: .3rem;
+    }
+    .stat-card .stat-value {
+      font-size: 2.4rem; font-weight: 800; letter-spacing: -1px;
+      line-height: 1; color: var(--text);
+    }
+    .stat-card .stat-icon {
+      position: absolute; right: 1.2rem; top: 50%; transform: translateY(-50%);
+      font-size: 2.2rem; opacity: .08;
+    }
+    .stat-card.accent::before {
+      background: linear-gradient(135deg, rgba(245,158,11,.08) 0%, transparent 60%);
+    }
+    .stat-card.accent .stat-value { color: var(--accent); }
+    .stat-card.success::before {
+      background: linear-gradient(135deg, rgba(34,197,94,.07) 0%, transparent 60%);
+    }
+    .stat-card.success .stat-value { color: var(--success); }
+
+    /* ── Year pills ─────────────────────────────────────────────────────────── */
+    .year-row {
+      display: flex; align-items: center; gap: .7rem;
+      padding: .55rem .9rem;
+      border-radius: 8px;
+      transition: background .15s;
+    }
+    .year-row:hover { background: var(--surface-2); }
+    .year-badge {
+      font-family: var(--mono); font-size: .78rem; font-weight: 500;
+      background: var(--primary-dim);
+      color: var(--primary);
+      border-radius: 5px;
+      padding: .15rem .55rem;
+      min-width: 3.5rem;
+      text-align: center;
+    }
+    .year-count { font-weight: 700; }
+    .year-bar-wrap { flex: 1; height: 4px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+    .year-bar      { height: 100%; background: var(--primary); border-radius: 4px; transition: width .6s ease; }
+
+    /* ── Source list ─────────────────────────────────────────────────────────── */
+    .source-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.1rem;
+      transition: border-color .2s;
+    }
+    .source-card:hover { border-color: var(--border-hi); }
+    .source-header {
+      display: flex; align-items: center; gap: .8rem;
+      padding: .9rem 1.1rem;
+      background: var(--surface-2);
+    }
+    .source-url {
+      flex: 1; font-family: var(--mono); font-size: .78rem;
+      color: var(--primary); word-break: break-all;
+      text-decoration: none;
+    }
+    .source-url:hover { color: #60a5fa; text-decoration: underline; }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .status-dot.scraped   { background: var(--success); box-shadow: 0 0 6px rgba(34,197,94,.6); }
+    .status-dot.unscraped { background: var(--text-muted); }
+    .doc-list {
+      padding: .5rem 1.1rem .7rem;
+      display: flex; flex-wrap: wrap; gap: .4rem;
+    }
+    .doc-chip {
+      font-family: var(--mono); font-size: .7rem;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .2rem .6rem;
+      color: var(--text-muted);
+      transition: border-color .15s;
+      max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .doc-chip:hover { border-color: var(--primary); color: var(--text); }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────────── */
+    .btn-primary {
+      background: var(--primary); border-color: var(--primary);
+      font-weight: 700; font-size: .82rem; letter-spacing: .04em;
+    }
+    .btn-primary:hover { background: #2563eb; border-color: #2563eb; }
+    .btn-scrape {
+      background: transparent;
+      border: 1px solid var(--border-hi);
+      color: var(--text-muted);
+      font-size: .78rem; font-weight: 700;
+      padding: .3rem .8rem;
+      border-radius: 7px;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    .btn-scrape:hover { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn-scrape.running {
+      border-color: var(--accent); color: var(--accent);
+      animation: pulse-border 1.2s ease-in-out infinite;
+    }
+    .btn-scrape.done { border-color: var(--success); color: var(--success); }
+    @keyframes pulse-border {
+      0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,.4); }
+      50%      { box-shadow: 0 0 0 4px rgba(245,158,11,.1); }
+    }
+
+    /* ── Search results ─────────────────────────────────────────────────────── */
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.1rem 1.3rem;
+      margin-bottom: .8rem;
+      transition: border-color .2s, transform .15s;
+      position: relative;
+    }
+    .result-card:hover { border-color: var(--primary); transform: translateX(3px); }
+    .result-ratio {
+      position: absolute; top: .9rem; right: 1rem;
+      font-family: var(--mono); font-size: .82rem; font-weight: 700;
+      padding: .2rem .6rem;
+      border-radius: 6px;
+    }
+    .result-ratio.high   { background: rgba(34,197,94,.15);  color: var(--success); }
+    .result-ratio.medium { background: rgba(245,158,11,.12); color: var(--accent); }
+    .result-ratio.low    { background: rgba(93,117,148,.12); color: var(--text-muted); }
+    .result-url {
+      font-family: var(--mono); font-size: .75rem;
+      color: var(--primary); word-break: break-all;
+    }
+    .result-chunk {
+      margin-top: .5rem; font-size: .87rem;
+      color: var(--text); line-height: 1.55;
+      background: var(--surface-2); border-radius: 8px;
+      padding: .6rem .85rem; border-left: 3px solid var(--primary-dim);
+    }
+
+    /* ── Similarity slider ───────────────────────────────────────────────────── */
+    .threshold-wrap { display: flex; align-items: center; gap: .8rem; }
+    .threshold-wrap input[type=range] { flex: 1; accent-color: var(--primary); }
+    .threshold-val {
+      font-family: var(--mono); font-weight: 700;
+      color: var(--primary); min-width: 3rem; text-align: right;
+    }
+
+    /* ── Config list ─────────────────────────────────────────────────────────── */
+    .config-item {
+      display: flex; align-items: center; gap: .7rem;
+      padding: .65rem .9rem;
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    .config-item:last-child { border-bottom: none; }
+    .config-item:hover { background: var(--surface-2); }
+    .config-item-url {
+      flex: 1; font-family: var(--mono); font-size: .78rem;
+      color: var(--text); word-break: break-all;
+    }
+
+    /* ── Live indicator ─────────────────────────────────────────────────────── */
+    .live-dot {
+      display: inline-block; width: 7px; height: 7px;
+      background: var(--success); border-radius: 50%;
+      animation: blink 1.6s ease-in-out infinite;
+      margin-right: .4rem;
+    }
+    @keyframes blink {
+      0%,100% { opacity: 1; } 50% { opacity: .3; }
+    }
+
+    /* ── Misc ────────────────────────────────────────────────────────────────── */
+    .mono { font-family: var(--mono); }
+    .text-muted-custom { color: var(--text-muted) !important; }
+    pre { font-family: var(--mono); font-size: .82rem; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ──────────────────────────────────────────────────────────────── -->
+<nav class="navbar navbar-expand-lg sticky-top">
+  <div class="container-fluid" style="max-width:1280px; margin:auto; padding:0 1.5rem;">
+
+    <!-- Brand / Logo -->
+    <a class="navbar-brand" href="{{ url_for('home') }}">
+      <span class="brand-icon"><i class="bi bi-file-pdf-fill"></i></span>
+      DocIndex
+    </a>
+
+    <button class="navbar-toggler border-0" type="button"
+            data-bs-toggle="collapse" data-bs-target="#navContent">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navContent">
+      <!-- Nav links -->
+      <ul class="navbar-nav me-auto ms-3 gap-1">
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'home' %}active{% endif %}"
+             href="{{ url_for('home') }}">
+            <i class="bi bi-house me-1"></i>Home
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'scrapper' %}active{% endif %}"
+             href="{{ url_for('scrapper') }}">
+            <i class="bi bi-broadcast me-1"></i>Scrapper
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'configuration' %}active{% endif %}"
+             href="{{ url_for('configuration') }}">
+            <i class="bi bi-sliders me-1"></i>Configuration
+          </a>
+        </li>
+      </ul>
+
+      <!-- Search bar -->
+      <form class="navbar-search" action="{{ url_for('search') }}" method="get">
+        <input class="form-control" type="search" name="q"
+               placeholder="Search documents…"
+               value="{{ request.args.get('q', '') }}"
+               autocomplete="off">
+        <button class="btn-search" type="submit">
+          <i class="bi bi-search"></i> Search
+        </button>
+      </form>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Content ─────────────────────────────────────────────────────────────── -->
+<main class="page-wrap">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ 'danger' if cat == 'error' else 'info' }} alert-dismissible fade show mb-3" role="alert">
+          {{ msg }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</main>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc4s9bIOgUxi8T/jzmLCBHBBpzeHhskmRnMoiP8B0C8M"
+        crossorigin="anonymous"></script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

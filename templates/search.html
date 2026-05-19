@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Búsqueda{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-search me-2" style="color:var(--primary)"></i>Búsqueda
+  </h1>
+  <p class="page-subtitle">Búsqueda por similitud de Levenshtein en documentos indexados.</p>
+</div>
+
+<!-- ── Search form ────────────────────────────────────────────────────────── -->
+<div class="card mb-4">
+  <div class="card-body">
+    <form action="{{ url_for('search') }}" method="get" id="searchForm">
+      <!-- Query row -->
+      <div class="input-group mb-3">
+        <span class="input-group-text"
+              style="background:var(--surface-2);border-color:var(--border);color:var(--text-muted);">
+          <i class="bi bi-search"></i>
+        </span>
+        <input type="text" name="q" id="queryInput"
+               class="form-control"
+               style="background:var(--surface-2);border-color:var(--border);color:var(--text);font-size:.9rem;"
+               placeholder="Ingresa palabras o frases a buscar…"
+               value="{{ query }}"
+               autocomplete="off"
+               autofocus>
+        <button type="submit" class="btn btn-primary px-4">
+          <i class="bi bi-search me-1"></i>Search
+        </button>
+      </div>
+
+      <!-- Threshold slider -->
+      <div class="d-flex align-items-center gap-3">
+        <label class="mono text-muted-custom" style="font-size:.78rem;white-space:nowrap;">
+          <i class="bi bi-sliders me-1"></i>Similitud mínima
+        </label>
+        <div class="threshold-wrap flex-grow-1">
+          <span class="mono text-muted-custom" style="font-size:.72rem;">0%</span>
+          <input type="range" name="threshold" id="thresholdSlider"
+                 min="0" max="1" step="0.01"
+                 value="{{ threshold }}">
+          <span class="mono text-muted-custom" style="font-size:.72rem;">100%</span>
+          <span class="threshold-val" id="thresholdVal">
+            {{ (threshold * 100)|int }}%
+          </span>
+        </div>
+      </div>
+      <div class="mt-1 text-muted-custom" style="font-size:.72rem;">
+        <i class="bi bi-info-circle me-1"></i>
+        0 = cualquier texto &nbsp;|&nbsp; 1 = coincidencia exacta &nbsp;|&nbsp;
+        Recomendado: 40–60%
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Results ────────────────────────────────────────────────────────────── -->
+{% if query %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <span class="mono" style="font-size:.8rem;color:var(--text-muted);">Buscando: </span>
+    <span class="mono" style="font-size:.88rem;background:var(--primary-dim);color:var(--primary);border-radius:5px;padding:.15rem .55rem;">
+      {{ query }}
+    </span>
+  </div>
+  <div class="mono text-muted-custom" style="font-size:.78rem;">
+    {% if results %}
+      <i class="bi bi-check2 text-success me-1"></i>
+      {{ results|length }} resultado{{ 's' if results|length != 1 else '' }}
+      &nbsp;·&nbsp; umbral {{ (threshold * 100)|round(1) }}%
+    {% else %}
+      <i class="bi bi-x-circle text-danger me-1"></i>
+      Sin resultados
+    {% endif %}
+  </div>
+</div>
+
+{% if results %}
+{% for r in results %}
+{% set ratio_class = 'high' if r.ratio >= 75 else ('medium' if r.ratio >= 50 else 'low') %}
+<div class="result-card">
+  <!-- Similarity badge -->
+  <div class="result-ratio {{ ratio_class }}">
+    {{ "%.1f"|format(r.ratio) }}%
+  </div>
+
+  <!-- Document info -->
+  <div class="d-flex align-items-center gap-2 mb-1" style="padding-right:4.5rem;">
+    <i class="bi bi-file-pdf text-danger" style="font-size:.9rem;"></i>
+    <span class="mono text-muted-custom" style="font-size:.72rem;">{{ r.filename }}</span>
+  </div>
+
+  <a href="{{ r.url }}" target="_blank" class="result-url d-block mb-2">
+    <i class="bi bi-box-arrow-up-right me-1" style="font-size:.7rem;"></i>
+    {{ r.url }}
+  </a>
+
+  <!-- Text block -->
+  <div class="result-chunk">
+    {{ r.chunk }}
+  </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted-custom">
+    <i class="bi bi-binoculars display-5 d-block mb-2 opacity-25"></i>
+    No se encontraron coincidencias para
+    <strong class="text-light">«{{ query }}»</strong>
+    con similitud ≥ {{ (threshold * 100)|round(1) }}%.<br>
+    <span style="font-size:.85rem;">
+      Intenta reducir el umbral de similitud o usar términos más cortos.
+    </span>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- No search yet -->
+<div class="card">
+  <div class="card-body text-center py-5 text-muted-custom">
+    <i class="bi bi-search display-5 d-block mb-2 opacity-25"></i>
+    Ingresa un texto para iniciar la búsqueda.<br>
+    <span style="font-size:.82rem;">
+      Se busca por similitud de Levenshtein en todos los documentos indexados.
+    </span>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const slider = document.getElementById('thresholdSlider');
+  const valEl  = document.getElementById('thresholdVal');
+
+  function update() {
+    valEl.textContent = Math.round(slider.value * 100) + '%';
+  }
+
+  slider.addEventListener('input', update);
+  update(); // set initial display
+
+  // Auto-submit on slider release for quick feedback
+  slider.addEventListener('change', function () {
+    document.getElementById('searchForm').submit();
+  });
+})();
+</script>
+{% endblock %}
